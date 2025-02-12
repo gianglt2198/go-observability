@@ -1,0 +1,200 @@
+
+services:
+  db:
+    image: postgres:16.3-alpine3.20
+    container_name: db
+    restart: unless-stopped
+    volumes:
+      - ./tmp/db:/var/lib/postgresql/data
+    env_file:
+      - ./db.env
+    ports:
+      - "5433:5432"
+    networks:
+      - coffee-shop-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+ 
+  tempo-init:
+    image: &tempoImage grafana/tempo:latest
+    networks:
+    - coffee-shop-network
+    user: root
+    entrypoint:
+      - "chown"
+      - "10001:10001"
+      - "/var/tempo"
+    volumes:
+      - ./tmp/tempo-data:/var/tempo
+
+  memcached:
+    image: memcached:1.6.29
+    container_name: memcached
+    networks:
+      - coffee-shop-network
+    ports:
+      - "11211:11211"
+    environment:
+      - MEMCACHED_MAX_MEMORY=64m  # Set the maximum memory usage
+      - MEMCACHED_THREADS=4       # Number of threads to use
+
+  tempo:
+    image: *tempoImage
+    container_name: tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    networks:
+    - coffee-shop-network
+    volumes:
+      - ./deployment/tempo/tempo.yaml:/etc/tempo.yaml
+      - ./tmp/tempo-data:/var/tempo
+    ports:
+      - "3200:3200"   # tempo
+    depends_on:
+      - tempo-init
+      - memcached
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    restart: unless-stopped
+    networks:
+    - coffee-shop-network
+    volumes:
+      - ./deployment/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./tmp/prometheus:/prometheus
+    command:
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --web.enable-remote-write-receiver
+    - --enable-feature=exemplar-storage
+    - --enable-feature=native-histograms
+    ports:
+    - "9090:9090"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  
+  collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./deployment/otlp/otlp.config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "13133:13133" # health_check extension
+      - "55679:55679" # zpages extension
+      - "1888:1888"   # pprof extension
+      - "8888:8888"   # Prometheus metrics exposed by the collector
+      - "8889:8889"   # Prometheus exporter metrics
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP http receiver
+    networks:
+      - coffee-shop-network
+    depends_on:
+      - tempo
+      - prometheus
+
+  node_exporter:
+    image: quay.io/prometheus/node-exporter:latest
+    container_name: node_exporter
+    restart: unless-stopped
+    pid: host
+    networks:
+    - coffee-shop-network
+    volumes:
+      - ./tmp/exporter:/host:ro,rslave
+    command: '--path.rootfs=/host'
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - 3000:3000
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=123
+    networks:
+      - coffee-shop-network
+    volumes:
+      - ./tmp/grafana:/var/lib/grafana
+    depends_on:
+    - prometheus
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor
+    container_name: cadvisor
+    volumes:
+    - /:/rootfs:ro
+    - /var/run:/var/run:ro
+    - /sys:/sys:ro
+    - /var/lib/docker/:/var/lib/docker:ro
+    - /dev/disk/:/dev/disk:ro
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - /etc/machine-id:/etc/machine-id:ro
+    - /var/lib/dbus/machine-id:/var/lib/dbus/machine-id:ro
+    networks:
+      - coffee-shop-network
+    privileged: true
+    command:
+      - '-port=8098'
+      - '--docker_only=true'  # Only monitor Docker containers
+
+  loki:  
+    image: grafana/loki:latest  
+    container_name: loki  
+    command: -config.file=/etc/loki/loki.config.yaml  
+    ports:  
+      - "3100:3100"  
+    volumes:  
+      - ./deployment/loki/loki.config.yaml:/etc/loki/loki.config.yaml
+      - ./tmp/loki:/data/loki  
+    networks:  
+      - coffee-shop-network  
+    healthcheck:  
+      test: ["CMD-SHELL", "wget -q --tries=1 -O - http://localhost:3100/ready | grep -q -w ready || exit 1"]  
+      interval: 10s  
+      timeout: 5s  
+      retries: 5  
+
+  vector:  
+    image: timberio/vector:latest-alpine  
+    container_name: vector  
+    volumes:  
+      - ./deployment/vector/vector.dev.yaml:/etc/vector/vector.yaml:ro  
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # Required for docker_logs source  
+    ports:  
+      - "9598:9598"  # Prometheus metrics endpoint  
+    networks:  
+      - coffee-shop-network  
+    depends_on:  
+      - app  
+      - loki
+
+  app:
+    container_name: coffee-shop-app
+    build:
+      dockerfile: Dockerfile.dev
+    working_dir: /app
+    volumes:
+      - ./:/app
+    networks:
+      - coffee-shop-network
+    ports:
+      - 8081:8081
+    depends_on:
+      db:
+        condition: service_healthy
+    logging:  
+      driver: "json-file"  
+      options:  
+        max-size: "10m"  
+        max-file: "3"  
+        compress: "true"  
+
+networks:
+  coffee-shop-network:
+    driver: bridge
+
+
+    

@@ -1,0 +1,16 @@
+app:
+  name: coffee-shop-api
+  env: development
+  port: 8081
+
+database:
+  host: db
+  port: 5432
+  name: coffee_shop
+  user: postgres
+  password: postgres
+  max_connections: 100
+  timeout: 5s
+
+tracing:
+  endpoint: collector:4317

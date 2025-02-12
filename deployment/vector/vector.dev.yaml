@@ -1,0 +1,26 @@
+sources:
+  docker_logs:
+    type: docker_logs
+    include_containers: ["coffee-shop-app"]
+
+transforms:
+  parse_docker_logs:
+    type: remap
+    inputs:
+      - docker_logs
+    source: |
+      . = parse_json!(string!(.message))
+
+sinks:
+  loki:
+    type: loki
+    inputs: ["parse_docker_logs"]
+    endpoint: http://loki:3100
+    encoding:
+      codec: json
+    compression: gzip
+    labels:
+      service: "coffee-shop-app"
+      container_name: "{{container_name}}"
+      level: "{{level}}"
+    remove_timestamp: false

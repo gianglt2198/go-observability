@@ -1,0 +1,202 @@
+basePath: /
+definitions:
+  dto.CreateCoffeeRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      price:
+        type: number
+    required:
+    - name
+    - price
+    type: object
+  dto.UpdateCoffeeRequest:
+    properties:
+      description:
+        minLength: 1
+        type: string
+      id:
+        type: integer
+      name:
+        minLength: 1
+        type: string
+      price:
+        type: number
+    required:
+    - id
+    type: object
+  models.Coffee:
+    properties:
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      price:
+        type: number
+    type: object
+host: localhost:8081
+info:
+  contact:
+    email: fiber@swagger.io
+    name: API Support
+  description: This is coffee shop apis documentations
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Coffee Shop
+  version: "1.0"
+paths:
+  /api/coffee:
+    get:
+      consumes:
+      - application/json
+      description: ListCoffee
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Coffee'
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: ListCoffee
+      tags:
+      - coffee
+    post:
+      consumes:
+      - application/json
+      description: CreateCoffee
+      parameters:
+      - description: request body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateCoffeeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Coffee'
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: CreateCoffee
+      tags:
+      - coffee
+  /api/coffee/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: DeleteCoffee
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: boolean
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: DeleteCoffee
+      tags:
+      - coffee
+    get:
+      consumes:
+      - application/json
+      description: GetCoffee
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Coffee'
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: GetCoffee
+      tags:
+      - coffee
+    patch:
+      consumes:
+      - application/json
+      description: UpdateCoffee
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: request body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateCoffeeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Coffee'
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: UpdateCoffee
+      tags:
+      - coffee
+swagger: "2.0"

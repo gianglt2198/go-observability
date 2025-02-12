@@ -1,0 +1,61 @@
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+sources:
+  info_logs:
+    type: file
+    include:
+      - /logs/info.log
+    read_from: beginning
+    ignore_order_secs: 86400
+    fingerprint:
+      strategy: device_and_inode
+    compression: auto
+  error_logs:
+    type: file
+    include:
+      - /logs/error.log
+    read_from: beginning
+    ignore_older_secs: 86400
+    fingerprint:
+      strategy: device_and_inode
+    compression: auto
+
+# Transformations
+transforms:
+  info_logs_parser:
+    type: remap
+    inputs:
+      - info_logs
+    source: |
+      . = parse_json!(.message)  
+      .timestamp = parse_timestamp!(.ts, format: "%Y-%m-%dT%H:%M:%S.%fZ")  
+      .level = "info"  
+      .service = "coffee-shop-app"
+
+  error_logs_parser:
+    type: remap
+    inputs:
+      - error_logs
+    source: |
+      . = parse_json!(.message)  
+      .timestamp = parse_timestamp!(.ts, format: "%Y-%m-%dT%H:%M:%S.%fZ")  
+      .level = "error"  
+      .service = "coffee-shop-app"
+
+# Sinks
+sinks:
+  loki:
+    type: loki
+    inputs:
+      - info_logs_parser
+      - error_logs_parser
+    endpoint: http://loki:3100
+    encoding:
+      codec: json
+    labels:
+      service: "coffee-shop-app"
+      level: "{{level}}"
+      env: "dev"
+    out_of_order_timeout_secs: 300
+    remove_timestamp: false
