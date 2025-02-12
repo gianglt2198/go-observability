@@ -29,8 +29,6 @@ transforms:
       - info_logs
     source: |
       . = parse_json!(.message)  
-      .timestamp = parse_timestamp!(.ts, format: "%Y-%m-%dT%H:%M:%S.%fZ")  
-      .level = "info"  
       .service = "coffee-shop-app"
 
   error_logs_parser:
@@ -39,8 +37,6 @@ transforms:
       - error_logs
     source: |
       . = parse_json!(.message)  
-      .timestamp = parse_timestamp!(.ts, format: "%Y-%m-%dT%H:%M:%S.%fZ")  
-      .level = "error"  
       .service = "coffee-shop-app"
 
 # Sinks
